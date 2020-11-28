@@ -1,7 +1,9 @@
 export default class SortableTable {
   element = {};
+  subElements = {};
+
   constructor(headerColumns = [], {data = []} = {}) {
-    this.headerCols = headerColumns;
+    this.headersData = headerColumns;
     this.data = data;
     this.render();
   }
@@ -10,6 +12,45 @@ export default class SortableTable {
     const el = document.createElement('div');
     el.innerHTML = this.template;
     this.element = el.firstElementChild;
+    this.subElements = this.getSubElements(el);
+  }
+
+  sort(field, order) {
+    this.updateHeadersSortArrow(field, order);
+    this.subElements.body.innerHTML = this.getTableBodyRows(this.sortRows(field, order));
+  }
+
+  updateHeadersSortArrow(field, order) {
+    const allColumns = this.element.querySelectorAll('.sortable-table__cell[data-id]');
+    const currentColumn = this.element.querySelector(`.sortable-table__cell[data-id="${field}"]`);
+    allColumns.forEach(column => {
+      column.dataset.order = '';
+    });
+    currentColumn.dataset.order = order;
+  }
+
+  sortRows(field, order) {
+    const sortType = this.headersData.find(item => item.id === field)?.sortType;
+    const sortDirection = order === 'asc' ? 1 : -1;
+
+    return [...this.data].sort((a, b) => {
+      switch (sortType) {
+        case 'number':
+          return sortDirection * (a[field] - b[field]);
+        case 'string':
+          return sortDirection * a[field].localeCompare(b[field], ['ru', 'en']);
+        default:
+          return sortDirection * (a[field] - b[field]);
+      }
+    });
+  }
+
+  getSubElements(element) {
+    const elements = element.querySelectorAll('[data-element]');
+    return [...elements].reduce((accum, subElement) => {
+      accum[subElement.dataset.element] = subElement;
+      return accum;
+    }, {});
   }
 
   remove() {
@@ -17,36 +58,30 @@ export default class SortableTable {
   }
 
   destroy() {
-
+    this.remove();
+    this.subElements = {};
   }
 
   get template() {
-    return `
-      <div class="sortable-table">
-        ${this.tableHeader}
-        ${this.tableBody}
-      </div>
-    `;
+    return `<div class="sortable-table">
+              ${this.tableHeader}
+              ${this.tableBody}
+            </div>`;
   }
 
   get tableHeader() {
-    return `
-      <div data-element="header" class="sortable-table__header sortable-table__row">
-        ${this.headerColumns}
-      </div>
-    `;
+    return `<div data-element="header" class="sortable-table__header sortable-table__row">
+              ${this.headerColumns}
+            </div>`;
   }
 
   get headerColumns() {
-    return this.headerCols.map((headerCol) =>
-      `<div class="sortable-table__cell" data-id="${headerCol.id}" data-sortable="${headerCol.sortable}" data-order="asc">
+    return this.headersData.map((headerCol) =>
+      `<div class="sortable-table__cell" data-id="${headerCol.id}" data-sortable="${headerCol.sortable}" data-order="">
         <span>${headerCol.title}</span>
-        ${headerCol.sortable ?
-            `<span data-element="arrow" class="sortable-table__sort-arrow">
-              <span class="sort-arrow"></span>
-            </span>`
-            : ''
-          }
+        <span data-element="arrow" class="sortable-table__sort-arrow">
+            <span class="sort-arrow"></span>
+        </span>
       </div>`
     ).join('');
   }
@@ -54,25 +89,27 @@ export default class SortableTable {
   get tableBody() {
     return `
       <div data-element="body" class="sortable-table__body">
-        ${this.tableBodyRow}
-      </div>
-    `;
+        ${this.getTableBodyRows()}
+      </div>`;
   }
 
-  get tableBodyRows() {
-    return this.data.map((row) =>
-      `
-      <a href="/products/3d-ochki-epson-elpgs03" class="sortable-table__row">
-        <div class="sortable-table__cell">
-          <img class="sortable-table-image" alt="Image" src="http://magazilla.ru/jpg_zoom1/246743.jpg">
-        </div>
-        <div class="sortable-table__cell">3D очки Epson ELPGS03</div>
+  getTableBodyRows(data = this.data) {
+    return data.map((row) =>
+      `<a href="/products/${row.id}" class="sortable-table__row">
+        ${this.getTableRowColumns(row)}
+      </a>`
+    ).join('');
+  }
 
-        <div class="sortable-table__cell">16</div>
-        <div class="sortable-table__cell">91</div>
-        <div class="sortable-table__cell">6</div>
-      </a>
-    `
+  getTableRowColumns(value) {
+    const columns = this.headersData.map(({id, template}) => {
+      return {id, template};
+    });
+
+    return columns.map(({id, template}) =>
+      template
+        ? template(value[id])
+        : `<div class="sortable-table__cell">${value[id]}</div>`
     ).join('');
   }
 }
