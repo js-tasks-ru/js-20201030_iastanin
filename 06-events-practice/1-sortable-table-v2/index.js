@@ -6,9 +6,10 @@ export default class SortableTable {
   onSort = event => {
     const sortTarget = event.target.closest('[data-sortable="true"]');
     if (sortTarget) {
-      const id = sortTarget.dataset.id;
-      const sortDirection = this.sortDirections[sortTarget.dataset.order];
-      this.sort(id, sortDirection);
+      this.sorted = {id: sortTarget.dataset.id, order: this.sortDirections[sortTarget.dataset.order]};
+      sortTarget.dataset.order = this.sorted.order;
+      this.updateSortedArrow(sortTarget);
+      this.sort();
     }
   }
 
@@ -30,38 +31,35 @@ export default class SortableTable {
     el.innerHTML = this.template;
     this.element = el.firstElementChild;
     this.subElements = this.getSubElements(el);
-    this.sort(this.sorted.id, this.sorted.order);
+    this.sort();
     this.subElements.header.addEventListener('pointerdown', this.onSort);
   }
 
-  sort(id, order) {
-    this.updateHeadersSortArrow(id, order);
-    this.subElements.body.innerHTML = this.getTableBodyRows(this.sortRows(id, order));
+  sort() {
+    this.subElements.body.innerHTML = this.getTableBodyRows(this.sortRows());
   }
 
-  updateHeadersSortArrow(id, order) {
-    const allColumns = this.element.querySelectorAll('.sortable-table__cell[data-id]');
-    const currentColumn = this.element.querySelector(`.sortable-table__cell[data-id="${id}"]`);
-    allColumns.forEach(column => {
-      column.dataset.order = '';
-    });
-    currentColumn.dataset.order = order;
+  updateSortedArrow(sortTarget) {
+    const collWithArrow = this.element.querySelector('[data-element="arrow"]').closest('[data-sortable="true"]');
+    if (sortTarget.dataset.id !== collWithArrow.dataset.id) {
+      collWithArrow.querySelector('[data-element="arrow"]').remove();
+      sortTarget.innerHTML += this.getSortedArrow(sortTarget.dataset.id);
+    }
   }
 
-  sortRows(id, order) {
-    const {sortType, customSort} = this.headersData.find(item => item.id === id);
-    const sortDirection = order === 'asc' ? 1 : -1;
-
+  sortRows() {
+    const {sortType, customSort} = this.headersData.find(item => item.id === this.sorted.id);
+    const sortDirection = {'asc': 1, 'desc': -1};
     return [...this.data].sort((a, b) => {
       switch (sortType) {
         case 'number':
-          return sortDirection * (a[id] - b[id]);
+          return sortDirection[this.sorted.order] * (a[this.sorted.id] - b[this.sorted.id]);
         case 'string':
-          return sortDirection * a[id].localeCompare(b[id], ['ru', 'en']);
+          return sortDirection[this.sorted.order] * a[this.sorted.id].localeCompare(b[this.sorted.id], ['ru', 'en']);
         case 'custom':
-          return sortDirection * customSort(a[id], b[id]);
+          return sortDirection[this.sorted.order] * customSort(a[this.sorted.id], b[this.sorted.id]);
         default:
-          return sortDirection * (a[id] - b[id]);
+          return sortDirection[this.sorted.order] * (a[this.sorted.id] - b[this.sorted.id]);
       }
     });
   }
@@ -81,6 +79,7 @@ export default class SortableTable {
   destroy() {
     this.remove();
     this.subElements = {};
+    this.element = null;
   }
 
   get template() {
@@ -97,14 +96,19 @@ export default class SortableTable {
   }
 
   get headerColumns() {
-    return this.headersData.map((headerCol) =>
-      `<div class="sortable-table__cell" data-id="${headerCol.id}" data-sortable="${headerCol.sortable}" data-order="">
+    return this.headersData.map((headerCol) => {
+      const order = this.sorted.id === headerCol.id ? this.sorted.order : 'asc';
+      return `<div class="sortable-table__cell" data-id="${headerCol.id}" data-sortable="${headerCol.sortable}" data-order="${order}">
         <span>${headerCol.title}</span>
-        <span data-element="arrow" class="sortable-table__sort-arrow">
+        ${this.getSortedArrow(headerCol.id)}
+      </div>`;
+    }).join('');
+  }
+
+  getSortedArrow(headerColId) {
+    return headerColId === this.sorted.id ? `<span data-element="arrow" class="sortable-table__sort-arrow">
           <span class="sort-arrow"></span>
-        </span>
-      </div>`
-    ).join('');
+        </span>` : '';
   }
 
   get tableBody() {
