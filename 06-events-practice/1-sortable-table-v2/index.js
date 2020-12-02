@@ -73,7 +73,9 @@ export default class SortableTable {
   }
 
   remove() {
-    this.element.remove();
+    if (this.element) {
+      this.element.remove();
+    }
   }
 
   destroy() {
