@@ -37,7 +37,6 @@ export default class ColumnChart {
       this.subElements.body.innerHTML = this.columns;
       this.element.classList.remove('column-chart_loading');
     }
-    console.log(this.subElements.body.children.length, Object.values(this.data).length)
   }
 
   getChartElements() {
